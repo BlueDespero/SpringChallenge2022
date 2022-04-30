@@ -10,8 +10,31 @@ heroes_per_player = int(input())  # Always 3
 
 # game loop
 
-class Hero():
-    pass
+class Entity():
+    def __init__(self, id, x, y):
+        self.id = id
+        self.x = x
+        self.y = y
+
+
+
+class Hero(Entity):
+    def __init__(self, id, x, y):
+        super().__init__(id, x, y)
+
+
+class Monster(Entity):
+
+    def __init__(self, id, x, y, health, vx, vy, near_base, threat_for):
+        super().__init__(id, x, y)
+        self.health = health
+        self.vx = vx
+        self.xy = vy
+        self.neat_base = near_base
+        self.threat_for = threat_for
+
+    def connects_in(self):
+        pass
 
 class Monster():
     pass
