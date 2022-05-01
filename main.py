@@ -3,6 +3,7 @@
 
 # base_x: The corner of the map representing your base
 import heapq
+import sys
 
 import numpy as np
 
@@ -23,9 +24,6 @@ class Entity():
         self.x = x
         self.y = y
 
-    def move(self, _vx, _vy):
-        self.x += _vx
-        self.y += _vy
 
 
 class Hero(Entity):
@@ -33,16 +31,12 @@ class Hero(Entity):
         super().__init__(id, x, y)
         self.target = (0, 0)
 
-    def move(self):
-        _vx, _vy = self.target
-        super().move(_vx, _vy)
-
 
 class Monster(Entity):
 
     def __init__(self, id, x, y, health, vx, vy, near_base):
         super().__init__(id, x, y)
-        self.priority = None
+        self.priority = 0
         self.hits_in = None
         self.health = health
         self.vx = vx
@@ -51,8 +45,8 @@ class Monster(Entity):
         self.alive = True
         self.set_priority()
 
-    def move(self):
-        super().move(self.vx, self.vy)
+    def __lt__(self, other):
+        return self.priority < other.priority
 
     def connects_in(self):
         counter = 0
@@ -76,6 +70,7 @@ class Monster(Entity):
         _, turns = closest_hero(self)
         prop_priority -= turns
 
+        # print(prop_priority, file=sys.stderr)
         self.priority = prop_priority
 
 
@@ -88,9 +83,12 @@ def closest_hero(monster: Monster, ):
     for hero in heroes:
         counter = 1
 
-        while distance(hero.x, hero.y, monster.x + monster.vx * counter,
-                       monster.y + monster.vy * counter) <= 800 * counter:
+        dist = distance(hero.x, hero.y, monster.x + monster.vx * counter, monster.y + monster.vy * counter)
+
+        while dist >= 800 * counter:
             counter += 1
+            # print(dist, file=sys.stderr)
+            dist = distance(hero.x, hero.y, monster.x + monster.vx * counter, monster.y + monster.vy * counter)
 
         if counter < closest_h_turns:
             closest_h_turns = counter
@@ -121,7 +119,7 @@ while True:
                                                                                                input().split()]
         if _type == 0 and threat_for == 1:
             this_mon = Monster(_id, x, y, health, vx, vy, near_base)
-            heapq.heappush(monsters, (-this_mon.priority, this_mon))
+            heapq.heappush(monsters, (this_mon.priority, this_mon))
         elif _type == 1:
             heroes.append(Hero(_id, x, y))
 
@@ -129,14 +127,16 @@ while True:
     # To debug: print("Debug messages...", file=sys.stderr, flush=True)
 
     # In the first league: MOVE <x> <y> | WAIT; In later leagues: | SPELL <spellParams>;
-    targets = heapq.nlargest(min(heroes_per_player, len(monsters)), monsters)
+    print(monsters, file=sys.stderr)
+    targets = heapq.nsmallest(min(heroes_per_player, len(monsters)), monsters)
     if not targets:
         print("WAIT\nWAIT\nWAIT")
     else:
         for i in range(heroes_per_player):
             if targets:
                 target = targets.pop()[1]
-                # print("%s %s %s %s  || %s %s" % (target.x, target.vx, target.y, target.vy, target.x + target.vx, target.y + target.vy), file=sys.stderr)
+                # print("%s %s %s %s  || %s %s" % (target.x, target.vx, target.y, target.vy, target.x + target.vx,
+                # target.y + target.vy), file=sys.stderr)
                 print("MOVE %s %s" % (target.x + target.vx, target.y + target.vy))
             else:
                 print("WAIT")
