@@ -11,11 +11,23 @@ base_x, base_y = [int(i) for i in input().split()]
 heroes_per_player = int(input())  # Always 3
 heroes = []
 
+print(base_x, file=sys.stderr)
+print(base_y, file=sys.stderr)
+
 
 # game loop
 
 def distance(x1, y1, x2, y2):
     return np.round(np.linalg.norm((x1 - x2, y1 - y2)))
+
+
+def get_default_position():
+    if base_x == 0:
+        positions = [(1200, 5000), (3500, 3500), (5000, 600)]
+    else:
+        positions = [(12000, 8000), (14000, 6000), (17000, 4000)]
+    for i in range(3):
+        yield positions[i]
 
 
 class Entity():
@@ -25,11 +37,16 @@ class Entity():
         self.y = y
 
 
-
 class Hero(Entity):
-    def __init__(self, id, x, y):
+    def __init__(self, id, x, y, def_pos=(0, 0)):
         super().__init__(id, x, y)
         self.target = (0, 0)
+        self.def_x = def_pos[0]
+        self.def_y = def_pos[1]
+
+    def update(self, update_hero):
+        self.x = update_hero.x
+        self.y = update_hero.y
 
 
 class Monster(Entity):
@@ -97,8 +114,16 @@ def closest_hero(monster: Monster, ):
     return closest_h, closest_h_turns
 
 
+def update_hero(update_hero: Hero):
+    hero: Hero
+    for hero in heroes:
+        if hero.id == update_hero.id:
+            hero.update(update_hero)
+
+
+def_pos_gen = get_default_position()
+
 while True:
-    heroes = []
     monsters = []
     for i in range(2):
         # health: Each player's base health
@@ -121,22 +146,22 @@ while True:
             this_mon = Monster(_id, x, y, health, vx, vy, near_base)
             heapq.heappush(monsters, (this_mon.priority, this_mon))
         elif _type == 1:
-            heroes.append(Hero(_id, x, y))
+            if len(heroes) < 3:
+                heroes.append(Hero(_id, x, y, next(def_pos_gen)))
+            else:
+                update_hero(Hero(_id, x, y))
 
     # Write an action using print
     # To debug: print("Debug messages...", file=sys.stderr, flush=True)
 
     # In the first league: MOVE <x> <y> | WAIT; In later leagues: | SPELL <spellParams>;
-    print(monsters, file=sys.stderr)
     targets = heapq.nsmallest(min(heroes_per_player, len(monsters)), monsters)
-    if not targets:
-        print("WAIT\nWAIT\nWAIT")
-    else:
-        for i in range(heroes_per_player):
-            if targets:
-                target = targets.pop()[1]
-                # print("%s %s %s %s  || %s %s" % (target.x, target.vx, target.y, target.vy, target.x + target.vx,
-                # target.y + target.vy), file=sys.stderr)
-                print("MOVE %s %s" % (target.x + target.vx, target.y + target.vy))
-            else:
-                print("WAIT")
+
+    for i in range(heroes_per_player):
+        if targets:
+            target = targets.pop()[1]
+            # print("%s %s %s %s  || %s %s" % (target.x, target.vx, target.y, target.vy, target.x + target.vx,
+            # target.y + target.vy), file=sys.stderr)
+            print("MOVE %s %s" % (target.x + target.vx, target.y + target.vy))
+        else:
+            print("MOVE %s %s" % (heroes[i].def_x, heroes[i].def_y))
