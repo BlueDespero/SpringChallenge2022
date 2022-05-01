@@ -3,6 +3,7 @@
 
 # base_x: The corner of the map representing your base
 import heapq
+import itertools
 import sys
 
 import numpy as np
@@ -30,7 +31,7 @@ def get_default_position():
         yield positions[i]
 
 
-class Entity():
+class Entity:
     def __init__(self, id, x, y):
         self.id = id
         self.x = x
@@ -91,21 +92,14 @@ class Monster(Entity):
         self.priority = prop_priority
 
 
-def closest_hero(monster: Monster, ):
+def closest_hero(monster: Monster):
     closest_h = None
     closest_h_turns = 1000000
 
     hero: Hero
 
     for hero in heroes:
-        counter = 1
-
-        dist = distance(hero.x, hero.y, monster.x + monster.vx * counter, monster.y + monster.vy * counter)
-
-        while dist >= 800 * counter:
-            counter += 1
-            # print(dist, file=sys.stderr)
-            dist = distance(hero.x, hero.y, monster.x + monster.vx * counter, monster.y + monster.vy * counter)
+        counter = get_turns_distance(hero, monster)
 
         if counter < closest_h_turns:
             closest_h_turns = counter
@@ -119,6 +113,43 @@ def update_hero(update_hero: Hero):
     for hero in heroes:
         if hero.id == update_hero.id:
             hero.update(update_hero)
+
+
+def get_turns_distance(hero: Hero, monster: Monster):
+    counter = 1
+    dist = distance(hero.x, hero.y, monster.x + monster.vx * counter, monster.y + monster.vy * counter)
+
+    while dist >= 800 * counter:
+        counter += 1
+        dist = distance(hero.x, hero.y, monster.x + monster.vx * counter, monster.y + monster.vy * counter)
+
+    return counter
+
+
+def match_heroes_targets(targets):
+    all_perms = itertools.permutations(range(3))
+    targets = [t[1] for t in targets]
+
+    best_distance = 10000
+    best_perm = None
+
+    for perm in all_perms:
+        distances = 0
+        for i, p in enumerate(perm):
+            if len(targets) > i:
+                distances += get_turns_distance(heroes[p], targets[i])
+
+        print("%s %s" % (perm, distances), file=sys.stderr)
+        if best_distance > distances:
+            best_distance = distances
+            best_perm = perm
+
+    for i, p in enumerate(best_perm):
+        if len(targets) > best_perm.index(i):
+            target = targets[best_perm.index(i)]
+            print("MOVE %s %s" % (target.x + target.vx, target.y + target.vy))
+        else:
+            print("MOVE %s %s" % (heroes[i].def_x, heroes[i].def_y))
 
 
 def_pos_gen = get_default_position()
@@ -157,6 +188,8 @@ while True:
     # In the first league: MOVE <x> <y> | WAIT; In later leagues: | SPELL <spellParams>;
     targets = heapq.nsmallest(min(heroes_per_player, len(monsters)), monsters)
 
+    match_heroes_targets(targets)
+    '''
     for i in range(heroes_per_player):
         if targets:
             target = targets.pop()[1]
@@ -165,3 +198,4 @@ while True:
             print("MOVE %s %s" % (target.x + target.vx, target.y + target.vy))
         else:
             print("MOVE %s %s" % (heroes[i].def_x, heroes[i].def_y))
+    '''
