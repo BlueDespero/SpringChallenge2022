@@ -54,7 +54,7 @@ class Hero(Entity):
 
 class Monster(Entity):
 
-    def __init__(self, id, x, y, health, vx, vy, near_base):
+    def __init__(self, id, x, y, health, vx, vy, near_base, threat_for, is_controlled, shield_life):
         super().__init__(id, x, y)
         self.priority = 0
         self.hits_in = None
@@ -63,7 +63,10 @@ class Monster(Entity):
         self.vy = vy
         self.neat_base = near_base
         self.alive = True
-        self.set_priority()
+        if threat_for == 1:
+            self.set_priority()
+        self.is_controlled = is_controlled == 1
+        self.is_shielded = shield_life != 0
 
     def __lt__(self, other):
         return self.priority < other.priority
@@ -153,6 +156,9 @@ def should_wind_attack(hero: Hero, monster: Monster):
     if mana < 10:
         return False
 
+    if monster.is_shielded:
+        return False
+
     if distance(hero.x, hero.y, monster.x, monster.y) > 1280:
         return False
 
@@ -195,21 +201,48 @@ def can_control_attack(monster: Monster):
     return good_vecs[0]
 
 
-def consider_non_threatening(hero: Hero):
-    if not non_threatening_monsters:
+def should_controll():
+    if mana < 40:
         return False
 
-    print(non_threatening_monsters, file=sys.stderr)
     good_control_targets = []
     mon: Monster
     for mon in non_threatening_monsters:
-        if vec := can_control_attack(mon):
-            good_control_targets.append([mon, vec])
-        print(vec, file=sys.stderr)
+        if not mon.is_shielded:
+            if vec := can_control_attack(mon):
+                good_control_targets.append([mon, vec])
 
     if good_control_targets:
         my_target = good_control_targets.pop()
         return "SPELL CONTROL %s %s %s" % (my_target[0].id, my_target[1][0], my_target[1][1])
+
+    return False
+
+
+def passive_agression(hero: Hero):
+    closest_mon = None
+    closest_mon_dist = 100000
+    mon: Monster
+    for mon in non_threatening_monsters:
+        sim_dist = get_turns_distance(hero, mon)
+        if sim_dist < closest_mon_dist:
+            closest_mon_dist = sim_dist
+            closest_mon = mon
+
+    non_threatening_monsters.remove(closest_mon)
+
+    return "MOVE %s %s" % (closest_mon.x + closest_mon.vx, closest_mon.y + closest_mon.vy)
+
+
+def consider_non_threatening(hero: Hero):
+    if not non_threatening_monsters:
+        return False
+
+    if answer := should_controll():
+        return answer
+
+    if answer := passive_agression(hero):
+        return answer
 
     return False
 
@@ -236,8 +269,8 @@ def match_heroes_targets(targets):
         if len(targets) > best_perm.index(i):
             target = targets[best_perm.index(i)]
             attack(heroes[i], target)
-        #elif non_threat_action := consider_non_threatening(heroes[i]):
-        #    print(non_threat_action)
+        elif non_threat_action := consider_non_threatening(heroes[i]):
+            print(non_threat_action)
         else:
             print("MOVE %s %s" % (heroes[i].def_x, heroes[i].def_y))
 
@@ -247,6 +280,7 @@ def_pos_gen = get_default_position()
 while True:
     monsters = []
     non_threatening_monsters = []
+    bandits = []
     for i in range(2):
         # health: Each player's base health
         # mana: Ignore in the first league; Spend ten mana to cast a spell
@@ -265,16 +299,18 @@ while True:
         _id, _type, x, y, shield_life, is_controlled, health, vx, vy, near_base, threat_for = [int(j) for j in
                                                                                                input().split()]
         if _type == 0 and threat_for == 1:
-            this_mon = Monster(_id, x, y, health, vx, vy, near_base)
+            this_mon = Monster(_id, x, y, health, vx, vy, near_base, threat_for, is_controlled, shield_life)
             heapq.heappush(monsters, (this_mon.priority, this_mon))
         if _type == 0 and threat_for == 0:
-            this_mon = Monster(_id, x, y, health, vx, vy, near_base)
+            this_mon = Monster(_id, x, y, health, vx, vy, near_base, threat_for, is_controlled, shield_life)
             non_threatening_monsters.append(this_mon)
         elif _type == 1:
             if len(heroes) < 3:
                 heroes.append(Hero(_id, x, y, next(def_pos_gen)))
             else:
                 update_hero(Hero(_id, x, y))
+        elif _type == 2 and distance(x,y,base_x,base_y) < 7000:
+            bandits.append(Hero(_id, x, y))
 
     # Write an action using print
     # To debug: print("Debug messages...", file=sys.stderr, flush=True)
