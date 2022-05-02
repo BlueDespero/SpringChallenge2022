@@ -159,9 +159,6 @@ def should_wind_attack(hero: Hero, monster: Monster):
     if distance(base_x, base_y, monster.x + monster.vx, monster.y + monster.vy) <= 5500:
         return True
 
-    #if not can_catch_kill(hero, monster):
-    #    return True
-
     return False
 
 
@@ -170,6 +167,51 @@ def attack(hero: Hero, monster: Monster):
         print("SPELL WIND %s %s" % (enemy_base_x, enemy_base_y))
     else:
         print("MOVE %s %s" % (monster.x + monster.vx, monster.y + monster.vy))
+
+
+def can_control_attack(monster: Monster):
+    print("CHECK", file=sys.stderr)
+    _vx, _vy = monster.vx, monster.vy
+    potential_vecs = [[-_vy, _vx], [_vy, -_vx]]
+    good_vecs = []
+    for p_vec in potential_vecs:
+        sim_x, sim_y = monster.x + p_vec[0], monster.y + p_vec[1]
+        counter = 0
+        reached = False
+        while counter < 45 and not reached:
+            sim_dist = distance(sim_x, sim_y, enemy_base_x, enemy_base_y)
+            if sim_dist <= 5000:
+                reached = True
+            counter += 1
+            sim_x += monster.vx
+            sim_y += monster.vy
+            print(counter, file=sys.stderr)
+
+        if reached:
+            good_vecs.append(p_vec)
+
+    if not good_vecs:
+        return False
+    return good_vecs[0]
+
+
+def consider_non_threatening(hero: Hero):
+    if not non_threatening_monsters:
+        return False
+
+    print(non_threatening_monsters, file=sys.stderr)
+    good_control_targets = []
+    mon: Monster
+    for mon in non_threatening_monsters:
+        if vec := can_control_attack(mon):
+            good_control_targets.append([mon, vec])
+        print(vec, file=sys.stderr)
+
+    if good_control_targets:
+        my_target = good_control_targets.pop()
+        return "SPELL CONTROL %s %s %s" % (my_target[0].id, my_target[1][0], my_target[1][1])
+
+    return False
 
 
 def match_heroes_targets(targets):
@@ -185,7 +227,7 @@ def match_heroes_targets(targets):
             if len(targets) > i:
                 distances += get_turns_distance(heroes[p], targets[i])
 
-        print("%s %s" % (perm, distances), file=sys.stderr)
+        # print("%s %s" % (perm, distances), file=sys.stderr)
         if best_distance > distances:
             best_distance = distances
             best_perm = perm
@@ -194,6 +236,8 @@ def match_heroes_targets(targets):
         if len(targets) > best_perm.index(i):
             target = targets[best_perm.index(i)]
             attack(heroes[i], target)
+        #elif non_threat_action := consider_non_threatening(heroes[i]):
+        #    print(non_threat_action)
         else:
             print("MOVE %s %s" % (heroes[i].def_x, heroes[i].def_y))
 
@@ -202,11 +246,12 @@ def_pos_gen = get_default_position()
 
 while True:
     monsters = []
+    non_threatening_monsters = []
     for i in range(2):
         # health: Each player's base health
         # mana: Ignore in the first league; Spend ten mana to cast a spell
         health, mana = [int(j) for j in input().split()]
-    entity_count = int(input())  # Amount of heros and monsters you can see
+    entity_count = int(input())  # Amount of heroes and monsters you can see
     for i in range(entity_count):
         # _id: Unique identifier
         # _type: 0=monster, 1=your hero, 2=opponent hero
@@ -222,6 +267,9 @@ while True:
         if _type == 0 and threat_for == 1:
             this_mon = Monster(_id, x, y, health, vx, vy, near_base)
             heapq.heappush(monsters, (this_mon.priority, this_mon))
+        if _type == 0 and threat_for == 0:
+            this_mon = Monster(_id, x, y, health, vx, vy, near_base)
+            non_threatening_monsters.append(this_mon)
         elif _type == 1:
             if len(heroes) < 3:
                 heroes.append(Hero(_id, x, y, next(def_pos_gen)))
