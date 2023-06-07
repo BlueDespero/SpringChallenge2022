@@ -41,15 +41,21 @@ class Entity:
 
 
 class Hero(Entity):
-    def __init__(self, id, x, y, def_pos=(0, 0)):
+    mind_shield = False
+
+    def __init__(self, id, x, y, is_controlled, shield_life, def_pos=(0, 0)):
         super().__init__(id, x, y)
         self.target = (0, 0)
         self.def_x = def_pos[0]
         self.def_y = def_pos[1]
+        if is_controlled == 1:
+            Hero.mind_shield = True
+        self.shield_life = shield_life
 
     def update(self, update_hero):
         self.x = update_hero.x
         self.y = update_hero.y
+        self.shield_life = update_hero.shield_life
 
 
 class Monster(Entity):
@@ -248,7 +254,16 @@ def consider_non_threatening(hero: Hero):
 
 
 def match_heroes_targets(targets):
-    all_perms = itertools.permutations(range(3))
+    available_heroes = [0, 1, 2]
+    should_shield = []
+
+    if Hero.mind_shield:
+        for i in range(heroes_per_player):
+            if heroes[i].shield_life == 0:
+                should_shield.append(i)
+
+
+    all_perms = itertools.permutations(available_heroes)
     targets = [t[1] for t in targets]
 
     best_distance = 10000
@@ -266,7 +281,9 @@ def match_heroes_targets(targets):
             best_perm = perm
 
     for i, p in enumerate(best_perm):
-        if len(targets) > best_perm.index(i):
+        if i in should_shield:
+            print("SPELL SHIELD %s" % heroes[i].id)
+        elif len(targets) > best_perm.index(i):
             target = targets[best_perm.index(i)]
             attack(heroes[i], target)
         elif non_threat_action := consider_non_threatening(heroes[i]):
@@ -306,11 +323,11 @@ while True:
             non_threatening_monsters.append(this_mon)
         elif _type == 1:
             if len(heroes) < 3:
-                heroes.append(Hero(_id, x, y, next(def_pos_gen)))
+                heroes.append(Hero(_id, x, y, is_controlled, shield_life, next(def_pos_gen)))
             else:
-                update_hero(Hero(_id, x, y))
-        elif _type == 2 and distance(x,y,base_x,base_y) < 7000:
-            bandits.append(Hero(_id, x, y))
+                update_hero(Hero(_id, x, y, is_controlled, shield_life))
+        #elif _type == 2 and distance(x,y,base_x,base_y) < 7000:
+        #    bandits.append(Hero(_id, x, y))
 
     # Write an action using print
     # To debug: print("Debug messages...", file=sys.stderr, flush=True)
